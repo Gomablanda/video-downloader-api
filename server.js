@@ -17,7 +17,7 @@ app.use(cors({
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Origen no permitido por CORS'));
+      callback(null, false); // origen no permitido: se bloquea sin lanzar error 500
     }
   }
 }));
