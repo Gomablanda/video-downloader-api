@@ -1,0 +1,78 @@
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Ejecuta yt-dlp en modo "solo información" (--dump-json).
+ * No descarga el vídeo, solo consulta sus metadatos. Es rápido (1-2s).
+ */
+function getVideoInfo(url) {
+  return new Promise((resolve, reject) => {
+    const ytdlp = spawn('yt-dlp', ['-j', '--no-warnings', url]);
+
+    let stdout = '';
+    let stderr = '';
+
+    ytdlp.stdout.on('data', (chunk) => { stdout += chunk; });
+    ytdlp.stderr.on('data', (chunk) => { stderr += chunk; });
+
+    ytdlp.on('close', (code) => {
+      if (code !== 0) {
+        return reject(new Error(`yt-dlp falló obteniendo info (código ${code}): ${stderr}`));
+      }
+      try {
+        const data = JSON.parse(stdout);
+        resolve({
+          id: data.id,
+          title: data.title,
+          thumbnail: data.thumbnail,
+          duration: data.duration,           // segundos
+          width: data.width,
+          height: data.height,
+          uploader: data.uploader,
+          filesizeApprox: data.filesize_approx || null
+        });
+      } catch (err) {
+        reject(new Error('No se pudo interpretar la respuesta de yt-dlp: ' + err.message));
+      }
+    });
+
+    ytdlp.on('error', (err) => {
+      reject(new Error('No se pudo ejecutar yt-dlp. ¿Está instalado? ' + err.message));
+    });
+  });
+}
+
+/**
+ * Descarga el vídeo original (sin marca de agua) a una carpeta temporal.
+ * Devuelve la ruta completa del archivo descargado.
+ */
+function downloadOriginalVideo(url, outputDir) {
+  return new Promise((resolve, reject) => {
+    const outputTemplate = path.join(outputDir, 'original.%(ext)s');
+
+    const ytdlp = spawn('yt-dlp', ['-o', outputTemplate, '--no-warnings', url]);
+
+    let stderr = '';
+    ytdlp.stderr.on('data', (chunk) => { stderr += chunk; });
+
+    ytdlp.on('close', (code) => {
+      if (code !== 0) {
+        return reject(new Error(`yt-dlp falló descargando el vídeo (código ${code}): ${stderr}`));
+      }
+
+      // yt-dlp elige la extensión real (mp4, etc.) — buscamos el archivo generado
+      const files = fs.readdirSync(outputDir).filter(f => f.startsWith('original.'));
+      if (files.length === 0) {
+        return reject(new Error('yt-dlp terminó pero no se encontró el archivo descargado'));
+      }
+      resolve(path.join(outputDir, files[0]));
+    });
+
+    ytdlp.on('error', (err) => {
+      reject(new Error('No se pudo ejecutar yt-dlp. ¿Está instalado? ' + err.message));
+    });
+  });
+}
+
+module.exports = { getVideoInfo, downloadOriginalVideo };
