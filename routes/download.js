@@ -54,15 +54,26 @@ router.post('/download', async (req, res) => {
   try {
       const originalPath = await downloadOriginalVideo(url, workDir);
 
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Disposition', 'attachment; filename="comeletras-tiktok.mp4"');
+      res.setHeader('Content-Type', 'video/mp4');
+          res.setHeader('Content-Disposition', 'attachment; filename="comeletras-tiktok.mp4"');
 
-    const stream = fs.createReadStream(finalPath);
-    stream.pipe(res);
+          const stream = fs.createReadStream(finalPath);
 
-    // Limpieza de archivos temporales cuando termina el envío (éxito o corte de conexión)
-    stream.on('close', () => cleanupDir(workDir));
-    res.on('close', () => cleanupDir(workDir));
+          stream.on('error', (streamErr) => {
+            console.error('Error leyendo el archivo final:', streamErr);
+            cleanupDir(workDir);
+            if (!res.headersSent) {
+              res.status(502).json({ error: 'No se pudo procesar este vídeo. Inténtalo de nuevo en unos segundos.' });
+            } else {
+              res.end();
+            }
+          });
+
+          stream.pipe(res);
+
+          // Limpieza de archivos temporales cuando termina el envío (éxito o corte de conexión)
+          stream.on('close', () => cleanupDir(workDir));
+          res.on('close', () => cleanupDir(workDir));
 
   } catch (err) {
     console.error(err);

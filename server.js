@@ -2,6 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const downloadRoutes = require('./routes/download');
 
+process.on('uncaughtException', (err) => {
+  console.error('Excepción no capturada (el servidor sigue vivo):', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Promesa rechazada sin capturar (el servidor sigue vivo):', reason);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
