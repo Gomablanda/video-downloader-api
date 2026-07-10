@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 function getVideoCodec(inputPath) {
   return new Promise((resolve, reject) => {
@@ -36,12 +37,15 @@ async function convertToIphoneCompatible(inputPath, outputPath, options = {}) {
     const ffmpeg = spawn('ffmpeg', args);
     let stderr = '';
     ffmpeg.stderr.on('data', (chunk) => { stderr += chunk; });
-    ffmpeg.on('close', (code) => {
-      if (code !== 0) {
-        return reject(new Error(`ffmpeg falló en la conversión (código ${code}): ${stderr.slice(-500)}`));
-      }
-      resolve(outputPath);
-    });
+      ffmpeg.on('close', (code) => {
+            if (code !== 0) {
+              return reject(new Error(`ffmpeg falló en la conversión (código ${code}): ${stderr.slice(-500)}`));
+            }
+            if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+              return reject(new Error(`ffmpeg terminó con código 0 pero el archivo de salida no existe o está vacío. stderr: ${stderr.slice(-500)}`));
+            }
+            resolve(outputPath);
+          });
     ffmpeg.on('error', (err) => {
       reject(new Error('No se pudo ejecutar ffmpeg. ¿Está instalado? ' + err.message));
     });
