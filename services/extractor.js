@@ -47,16 +47,22 @@ function getVideoInfo(url) {
  * Descarga el vídeo original (sin marca de agua) a una carpeta temporal.
  * Devuelve la ruta completa del archivo descargado.
  */
-function downloadOriginalVideo(url, outputDir) {
+function downloadOriginalVideo(url, outputDir, options = {}) {
+  const { noAudio = false } = options;
+
   return new Promise((resolve, reject) => {
     const outputTemplate = path.join(outputDir, 'original.%(ext)s');
 
+    const formatArgs = noAudio
+      ? ['-f', 'bv*[height<=720]/best[height<=720]']
+      : ['-S', 'res:720'];
+
     const ytdlp = spawn('yt-dlp', [
-  '-S', 'res:720',
-  '-o', outputTemplate,
-  '--no-warnings',
-  url
-]);
+      ...formatArgs,
+      '-o', outputTemplate,
+      '--no-warnings',
+      url
+    ]);
 
     let stderr = '';
     ytdlp.stderr.on('data', (chunk) => { stderr += chunk; });
@@ -66,7 +72,6 @@ function downloadOriginalVideo(url, outputDir) {
         return reject(new Error(`yt-dlp falló descargando el vídeo (código ${code}): ${stderr}`));
       }
 
-      // yt-dlp elige la extensión real (mp4, etc.) — buscamos el archivo generado
       const files = fs.readdirSync(outputDir).filter(f => f.startsWith('original.'));
       if (files.length === 0) {
         return reject(new Error('yt-dlp terminó pero no se encontró el archivo descargado'));

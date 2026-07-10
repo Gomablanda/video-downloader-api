@@ -39,7 +39,7 @@ router.post('/info', async (req, res) => {
  * y lo devuelve como archivo adjunto (streaming).
  */
 router.post('/download', async (req, res) => {
-  const { url } = req.body;
+  const { url, noAudio } = req.body;
 
   if (!isValidTikTokUrl(url)) {
     return res.status(400).json({ error: 'La URL no parece ser un enlace válido de TikTok.' });
@@ -52,8 +52,8 @@ router.post('/download', async (req, res) => {
   const finalPath = path.join(workDir, 'comeletras-tiktok.mp4');
 
   try {
-    const originalPath = await downloadOriginalVideo(url, workDir);
-    await convertToIphoneCompatible(originalPath, finalPath);
+      const originalPath = await downloadOriginalVideo(url, workDir, { noAudio: !!noAudio });
+          await convertToIphoneCompatible(originalPath, finalPath, { noAudio: !!noAudio });
 
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', 'attachment; filename="comeletras-tiktok.mp4"');
