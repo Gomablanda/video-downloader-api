@@ -1,3 +1,4 @@
+cat > download.js << 'EOF'
 const express = require('express');
 const fs = require('fs');
 const os = require('os');
@@ -10,12 +11,6 @@ const { convertToIphoneCompatible } = require('../services/converter');
 
 const router = express.Router();
 
-/**
- * POST /api/info
- * Body: { url }
- * Devuelve metadatos del vídeo (miniatura, duración, resolución...) SIN descargarlo.
- * Es el paso rápido que alimenta la vista previa en el frontend.
- */
 router.post('/info', async (req, res) => {
   const { url } = req.body;
 
@@ -32,51 +27,57 @@ router.post('/info', async (req, res) => {
   }
 });
 
-/**
- * POST /api/download
- * Body: { url }
- * Descarga el vídeo original, lo convierte a H.264+AAC compatible con iPhone,
- * y lo devuelve como archivo adjunto (streaming).
- */
 router.post('/download', async (req, res) => {
   const { url, noAudio } = req.body;
+  const t0 = Date.now();
+  const log = (msg) => console.log(`[download +${Date.now() - t0}ms] ${msg}`);
 
   if (!isValidTikTokUrl(url)) {
     return res.status(400).json({ error: 'La URL no parece ser un enlace válido de TikTok.' });
   }
 
-  // Carpeta temporal única por petición, para no mezclar archivos entre usuarios
   const workDir = path.join(os.tmpdir(), 'comeletras-' + crypto.randomUUID());
   fs.mkdirSync(workDir, { recursive: true });
 
   const finalPath = path.join(workDir, 'comeletras-tiktok.mp4');
 
   try {
-      const originalPath = await downloadOriginalVideo(url, workDir);
+    log('Empieza descarga con yt-dlp');
+    const originalPath = await downloadOriginalVideo(url, workDir);
+    log(`Descarga terminada: ${originalPath}`);
 
-      res.setHeader('Content-Type', 'video/mp4');
-          res.setHeader('Content-Disposition', 'attachment; filename="comeletras-tiktok.mp4"');
+    log('Empieza conversión con ffmpeg');
+    await convertToIphoneCompatible(originalPath, finalPath, { noAudio: !!noAudio });
+    const existsRightAfter = fs.existsSync(finalPath);
+    const sizeRightAfter = existsRightAfter ? fs.statSync(finalPath).size : 0;
+    log(`Conversión terminada. Archivo existe: ${existsRightAfter}, tamaño: ${sizeRightAfter} bytes`);
 
-          const stream = fs.createReadStream(finalPath);
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', 'attachment; filename="comeletras-tiktok.mp4"');
 
-          stream.on('error', (streamErr) => {
-            console.error('Error leyendo el archivo final:', streamErr);
-            cleanupDir(workDir);
-            if (!res.headersSent) {
-              res.status(502).json({ error: 'No se pudo procesar este vídeo. Inténtalo de nuevo en unos segundos.' });
-            } else {
-              res.end();
-            }
-          });
+    log('Justo antes de abrir el stream de lectura');
+    const existsBeforeStream = fs.existsSync(finalPath);
+    log(`¿Sigue existiendo justo antes de leer?: ${existsBeforeStream}`);
 
-          stream.pipe(res);
+    const stream = fs.createReadStream(finalPath);
 
-          // Limpieza de archivos temporales cuando termina el envío (éxito o corte de conexión)
-          stream.on('close', () => cleanupDir(workDir));
-          res.on('close', () => cleanupDir(workDir));
+    stream.on('error', (streamErr) => {
+      log(`ERROR leyendo el archivo final: ${streamErr.message}`);
+      cleanupDir(workDir);
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'No se pudo procesar este vídeo. Inténtalo de nuevo en unos segundos.' });
+      } else {
+        res.end();
+      }
+    });
+
+    stream.pipe(res);
+
+    stream.on('close', () => { log('Stream cerrado, limpiando carpeta temporal'); cleanupDir(workDir); });
+    res.on('close', () => { log('Respuesta cerrada, limpiando carpeta temporal'); cleanupDir(workDir); });
 
   } catch (err) {
-    console.error(err);
+    log(`ERROR en el proceso general: ${err.message}`);
     cleanupDir(workDir);
     res.status(502).json({ error: 'No se pudo procesar este vídeo. Inténtalo de nuevo en unos segundos.' });
   }
