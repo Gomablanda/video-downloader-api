@@ -52,8 +52,7 @@ router.post('/download', async (req, res) => {
   const finalPath = path.join(workDir, 'comeletras-tiktok.mp4');
 
   try {
-      const originalPath = await downloadOriginalVideo(url, workDir, { noAudio: !!noAudio });
-          await convertToIphoneCompatible(originalPath, finalPath, { noAudio: !!noAudio });
+      const originalPath = await downloadOriginalVideo(url, workDir);
 
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', 'attachment; filename="comeletras-tiktok.mp4"');

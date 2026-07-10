@@ -47,18 +47,12 @@ function getVideoInfo(url) {
  * Descarga el vídeo original (sin marca de agua) a una carpeta temporal.
  * Devuelve la ruta completa del archivo descargado.
  */
-function downloadOriginalVideo(url, outputDir, options = {}) {
-  const { noAudio = false } = options;
-
+function downloadOriginalVideo(url, outputDir) {
   return new Promise((resolve, reject) => {
     const outputTemplate = path.join(outputDir, 'original.%(ext)s');
 
-    const formatArgs = noAudio
-      ? ['-f', 'bv*[height<=720]/best[height<=720]']
-      : ['-S', 'res:720'];
-
     const ytdlp = spawn('yt-dlp', [
-      ...formatArgs,
+      '-S', 'res:720',
       '-o', outputTemplate,
       '--no-warnings',
       url
