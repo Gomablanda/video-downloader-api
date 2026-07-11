@@ -1,8 +1,8 @@
 FROM node:20-slim
 
-# ffmpeg desde los repositorios de Debian + python3/pip para instalar yt-dlp
+# ffmpeg + yt-dlp (descargador de vídeo) y ghostscript (compresor de PDF)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl && \
+    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl ghostscript && \
     pip3 install --break-system-packages -U yt-dlp && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

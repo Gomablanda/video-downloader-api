@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const downloadRoutes = require('./routes/download');
+const pdfCompressRoutes = require('./routes/pdfCompress');
 
 process.on('uncaughtException', (err) => {
   console.error('Excepción no capturada (el servidor sigue vivo):', err);
@@ -37,6 +38,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api', downloadRoutes);
+app.use('/api', pdfCompressRoutes);
 
 app.listen(PORT, () => {
   console.log(`Comeletras Tools API escuchando en http://localhost:${PORT}`);
